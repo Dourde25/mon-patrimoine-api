@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mon Patrimoine - Gestion & Suivi Automatique</title>
+    <!-- Tailwind CSS for sleek modern Finary-like UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for interactive charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { 
+            background-color: #0B0F17; 
+            color: #F1F5F9; 
+            font-family: 'Inter', system-ui, sans-serif; 
+        }
+        .card { 
+            background: #111827; 
+            border: 1px solid #1F2937; 
+            border-radius: 16px; 
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+        .card:hover {
+            border-color: #374151;
+        }
+        .input-field { 
+            background: #0B0F17; 
+            border: 1px solid #1F2937; 
+            color: #F8FAFC; 
+            border-radius: 8px; 
+            padding: 6px 10px; 
+            width: 100%; 
+        }
+        .input-field:focus { 
+            outline: none; 
+            border-color: #10B981; 
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-7xl mx-auto space-y-6">
+        
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-3xl font-bold tracking-tight text-white flex items-center gap-2">
+                    <i data-lucide="wallet" class="text-blue-500"></i> Gestion de Patrimoine
+                </h1>
+                <p class="text-slate-400 text-sm">Calcul automatique du patrimoine net et amortissement multi-crédits (Immo & Véhicules)</p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="resetData()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm border border-slate-700 flex items-center gap-2">
+                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i> Réinitialiser
+                </button>
+            </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="card p-5">
+                <div class="text-slate-400 text-xs font-semibold uppercase">Patrimoine Brut</div>
+                <div class="text-2xl font-bold text-white mt-2" id="kpi-brut">0 €</div>
+            </div>
+            <div class="card p-5">
+                <div class="text-slate-400 text-xs font-semibold uppercase">Passif / Dettes Total</div>
+                <div class="text-2xl font-bold text-rose-400 mt-2" id="kpi-dettes">0 €</div>
+            </div>
+            <div class="card p-5 border-emerald-500/30 bg-emerald-950/10">
+    <div class="text-emerald-400 text-xs font-semibold uppercase tracking-wider">Patrimoine Net</div>
+    <div class="text-3xl font-extrabold text-emerald-400 mt-2" id="kpi-net">0 €</div>
+</div>
+            <div class="card p-5">
+                <div class="text-slate-400 text-xs font-semibold uppercase">Mensualités Totales</div>
+                <div class="text-2xl font-bold text-amber-400 mt-2" id="kpi-mensualites">0 € / mois</div>
+            </div>
+        </div>
+
+        <!-- Charts & Breakdown -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Pie Chart -->
+            <div class="card p-5 lg:col-span-1 flex flex-col items-center justify-center">
+                <h3 class="text-lg font-semibold mb-4 w-full text-left flex items-center gap-2">
+                    <i data-lucide="pie-chart" class="text-blue-400 w-5 h-5"></i> Répartition Net
+                </h3>
+                <div class="w-64 h-64">
+                    <canvas id="patrimoineChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Summary Table -->
+            <div class="card p-5 lg:col-span-2 overflow-x-auto">
+                <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <i data-lucide="layers" class="text-emerald-400 w-5 h-5"></i> Synthèse par Catégorie
+                </h3>
+                <table class="w-full text-left text-sm text-slate-300">
+                    <thead class="bg-slate-800 text-slate-400 uppercase text-xs">
+                        <tr>
+                            <th class="p-3">Catégorie</th>
+                            <th class="p-3 text-right">Valeur Brut</th>
+                            <th class="p-3 text-right">Dettes</th>
+                            <th class="p-3 text-right">Valeur Nette</th>
+                            <th class="p-3 text-right">Mensualité</th>
+                        </tr>
+                    </thead>
+                    <tbody id="summary-tbody" class="divide-y divide-slate-800">
+                        <!-- Dynamic Rows -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Inputs Sections -->
+        <div class="space-y-6">
+            <!-- Immobilier -->
+            <div class="card p-5">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold flex items-center gap-2 text-blue-400">
+                        <i data-lucide="home" class="w-5 h-5"></i> Biens Immobiliers & Crédits Multiples
+                    </h3>
+                    <button onclick="addImmo()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1">
+                        <i data-lucide="plus" class="w-4 h-4"></i> Ajouter un bien
+                    </button>
+                </div>
+
+                <div id="immo-container" class="space-y-6">
+                    <!-- Dynamic Property Cards with Multi-Loans -->
+                </div>
+            </div>
+
+            <!-- Épargne & Bourse -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Comptes Épargne -->
+                <div class="card p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold flex items-center gap-2 text-cyan-400">
+                            <i data-lucide="piggy-bank" class="w-5 h-5"></i> Comptes Épargne
+                        </h3>
+                        <button onclick="addEpargne()" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1">
+                            <i data-lucide="plus" class="w-4 h-4"></i> Ajouter
+                        </button>
+                    </div>
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-slate-800 text-slate-400 text-xs uppercase">
+                            <tr>
+                                <th class="p-2">Compte / Livret</th>
+                                <th class="p-2">Solde (€)</th>
+                                <th class="p-2 text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="epargne-tbody" class="divide-y divide-slate-800"></tbody>
+                    </table>
+                </div>
+
+                <!-- Comptes Bourse -->
+                <div class="card p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold flex items-center gap-2 text-purple-400">
+                            <i data-lucide="trending-up" class="w-5 h-5"></i> Comptes Bourse & Investissements
+                        </h3>
+                        <button onclick="addBourse()" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1">
+                            <i data-lucide="plus" class="w-4 h-4"></i> Ajouter
+                        </button> 
+<button onclick="synchroAuto()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1">
+    Synchroniser Bourse
+</button>
+                    </div>
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-slate-800 text-slate-400 text-xs uppercase">
+                            <tr>
+                                <th class="p-2">Support / Courtier</th>
+                                <th class="p-2">Valorisation (€)</th>
+                                <th class="p-2 text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bourse-tbody" class="divide-y divide-slate-800"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Véhicules & Horlogerie -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Véhicules -->
+                <div class="card p-5 lg:col-span-2 space-y-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-lg font-semibold flex items-center gap-2 text-amber-400">
+                            <i data-lucide="car" class="w-5 h-5"></i> Véhicules & Financements
+                        </h3>
+                        <button onclick="addAuto()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1">
+                            <i data-lucide="plus" class="w-4 h-4"></i> Ajouter un véhicule
+                        </button>
+                    </div>
+
+                    <div id="auto-container" class="space-y-4">
+                        <!-- Dynamic Auto Cards with Multi-Loans -->
+                    </div>
+                </div>
+
+                <!-- Montres -->
+                <div class="card p-5 lg:col-span-1">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold flex items-center gap-2 text-emerald-400">
+                            <i data-lucide="watch" class="w-5 h-5"></i> Horlogerie / Collection
+                        </h3>
+                        <button onclick="addHorlo()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1">
+                            <i data-lucide="plus" class="w-4 h-4"></i> Ajouter
+                        </button>
+                    </div>
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-slate-800 text-slate-400 text-xs uppercase">
+                            <tr>
+                                <th class="p-2">Modèle</th>
+                                <th class="p-2">Valeur (€)</th>
+                                <th class="p-2 text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="horlo-tbody" class="divide-y divide-slate-800"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Helper to get current YYYY-MM
+        function getCurrentYearMonth() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            return `${year}-${month}`;
+        }
+
+        // Helper to calculate months passed between startDate and today
+        function getMonthsPassed(startDateStr) {
+            if (!startDateStr) return 0;
+            const start = new Date(startDateStr + "-01");
+            const now = new Date();
+            
+            let months = (now.getFullYear() - start.getFullYear()) * 12;
+            months += now.getMonth() - start.getMonth();
+            return Math.max(0, months);
+        }
+
+        // Initial Data Structure
+        const defaultData = {
+            immo: [
+                { 
+                    name: "Appartement Personnel", 
+                    share: 100, 
+                    val: 210000, 
+                    loans: [
+                        { name: "Prêt Principal", loanOrig: 180000, startDate: "2023-01", durationMonths: 240, rate: 3.5, monthly: 1044 },
+                        { name: "Prêt Travaux / PTZ", loanOrig: 20000, startDate: "2023-01", durationMonths: 120, rate: 1.5, monthly: 179 }
+                    ]
+                },
+                { 
+                    name: "Maison (Indivision 50%)", 
+                    share: 50, 
+                    val: 320000, 
+                    loans: [
+                        { name: "Prêt Immobilier 1", loanOrig: 320000, startDate: "2023-10", durationMonths: 300, rate: 3.8, monthly: 1634 }
+                    ]
+                }
+            ],
+            epargne: [
+                { name: "Livret A", val: 22950 },
+                { name: "LDDS", val: 12000 }
+            ],
+            bourse: [
+                { name: "PEA BoursoBank", val: 15000 },
+                { name: "Compte Titres / Crypto", val: 5000 }
+            ],
+            auto: [
+                { 
+                    name: "BMW M3 E46", 
+                    val: 45000, 
+                    loans: [
+                        { name: "Crédit Auto", loanOrig: 15000, startDate: "2022-01", durationMonths: 60, rate: 4.5, monthly: 279 },
+                        { name: "Prêt Restauration", loanOrig: 5000, startDate: "2023-07", durationMonths: 24, rate: 3.0, monthly: 215 }
+                    ]
+                }
+            ],
+            horlo: [
+                { name: "TAG Heuer", val: 3500 },
+                { name: "Tudor", val: 2800 }
+            ]
+        };
+
+        let appData = JSON.parse(localStorage.getItem('patrimoineData')) || defaultData;
+
+        // Ensure epargne and bourse exist in migrated data
+        if (!appData.epargne) appData.epargne = defaultData.epargne;
+        if (!appData.bourse) appData.bourse = defaultData.bourse;
+
+        function migrateData() {
+            let modified = false;
+            ['immo', 'auto'].forEach(cat => {
+                if (appData[cat]) {
+                    appData[cat].forEach(item => {
+                        if (item.loans) {
+                            item.loans.forEach(loan => {
+                                if (loan.startDate === undefined) {
+                                    let past = loan.monthPassed || 0;
+                                    let d = new Date();
+                                    d.setMonth(d.getMonth() - past);
+                                    let y = d.getFullYear();
+                                    let m = String(d.getMonth() + 1).padStart(2, '0');
+                                    loan.startDate = `${y}-${m}`;
+                                    delete loan.monthPassed;
+                                    modified = true;
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+            if (modified) saveData();
+        }
+        migrateData();
+
+        function saveData() {
+            localStorage.setItem('patrimoineData', JSON.stringify(appData));
+            calculateAll();
+        }
+
+        function resetData() {
+            if(confirm("Réinitialiser les données aux valeurs par défaut ?")) {
+                appData = JSON.parse(JSON.stringify(defaultData));
+                saveData();
+            }
+        }
+
+        function calcCRD(loanOrig, ratePercent, durationMonths, startDate) {
+            if (!loanOrig || loanOrig <= 0) return 0;
+            let monthPassed = getMonthsPassed(startDate);
+            if (monthPassed >= durationMonths) return 0;
+            let r = (ratePercent / 100) / 12;
+            if (r === 0) return loanOrig - (loanOrig / durationMonths * monthPassed);
+            
+            let pmt = loanOrig * (r * Math.pow(1 + r, durationMonths)) / (Math.pow(1 + r, durationMonths) - 1);
+            let balance = loanOrig;
+            for (let i = 0; i < monthPassed; i++) {
+                let interest = balance * r;
+                let principal = pmt - interest;
+                balance -= principal;
+            }
+            return Math.max(0, balance);
+        }
+
+        let chartInstance = null;
+
+        function calculateAll() {
+            let immoBrut = 0, immoDette = 0, immoMens = 0;
+            let epargneBrut = 0;
+            let bourseBrut = 0;
+            let autoBrut = 0, autoDette = 0, autoMens = 0;
+            let horloBrut = 0;
+
+            // 1. RENDER IMMOBILIER
+            const immoContainer = document.getElementById('immo-container');
+            immoContainer.innerHTML = '';
+
+            appData.immo.forEach((bien, bienIdx) => {
+                let bienCrdTotal = 0;
+                let bienMensTotal = 0;
+
+                bien.loans.forEach(loan => {
+                    let crd = calcCRD(loan.loanOrig, loan.rate, loan.durationMonths, loan.startDate);
+                    bienCrdTotal += crd;
+                    bienMensTotal += (loan.monthly || 0);
+                });
+
+                let valShare = bien.val * (bien.share / 100);
+                let crdShare = bienCrdTotal * (bien.share / 100);
+                let mensShare = bienMensTotal * (bien.share / 100);
+
+                immoBrut += valShare;
+                immoDette += crdShare;
+                immoMens += mensShare;
+
+                let loansRowsHtml = '';
+                bien.loans.forEach((loan, loanIdx) => {
+                    let crdLoan = calcCRD(loan.loanOrig, loan.rate, loan.durationMonths, loan.startDate);
+                    loansRowsHtml += `
+                        <tr class="bg-slate-900/50">
+                            <td class="p-2 pl-4"><input type="text" value="${loan.name}" onchange="updateImmoLoan(${bienIdx}, ${loanIdx}, 'name', this.value)" class="input-field text-xs" placeholder="Ex: Prêt principal..."></td>
+                            <td class="p-2"><input type="number" value="${loan.loanOrig}" onchange="updateImmoLoan(${bienIdx}, ${loanIdx}, 'loanOrig', +this.value)" class="input-field text-xs"></td>
+                            <td class="p-2"><input type="month" value="${loan.startDate || getCurrentYearMonth()}" onchange="updateImmoLoan(${bienIdx}, ${loanIdx}, 'startDate', this.value)" class="input-field text-xs"></td>
+                            <td class="p-2"><input type="number" value="${loan.durationMonths}" onchange="updateImmoLoan(${bienIdx}, ${loanIdx}, 'durationMonths', +this.value)" class="input-field text-xs"></td>
+                            <td class="p-2"><input type="number" step="0.01" value="${loan.rate}" onchange="updateImmoLoan(${bienIdx}, ${loanIdx}, 'rate', +this.value)" class="input-field text-xs"></td>
+                            <td class="p-2"><input type="number" value="${loan.monthly}" onchange="updateImmoLoan(${bienIdx}, ${loanIdx}, 'monthly', +this.value)" class="input-field text-xs"></td>
+                            <td class="p-2 text-right font-semibold text-rose-300">${Math.round(crdLoan).toLocaleString('fr-FR')} €</td>
+                            <td class="p-2 text-center">
+                                <button onclick="deleteImmoLoan(${bienIdx}, ${loanIdx})" class="text-slate-500 hover:text-rose-400"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                immoContainer.innerHTML += `
+                    <div class="bg-slate-800/60 border border-slate-700/70 rounded-xl p-4 space-y-3">
+                        <div class="flex flex-col md:flex-row justify-between md:items-center gap-3 bg-slate-800 p-3 rounded-lg border border-slate-700">
+                            <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2">
+                                <div>
+                                    <label class="text-[10px] text-slate-400 uppercase font-bold">Nom du Bien</label>
+                                    <input type="text" value="${bien.name}" onchange="updateImmo(${bienIdx}, 'name', this.value)" class="input-field text-xs">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] text-slate-400 uppercase font-bold">Valeur 100% (€)</label>
+                                    <input type="number" value="${bien.val}" onchange="updateImmo(${bienIdx}, 'val', +this.value)" class="input-field text-xs">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] text-slate-400 uppercase font-bold">Part Détenue (%)</label>
+                                    <input type="number" value="${bien.share}" onchange="updateImmo(${bienIdx}, 'share', +this.value)" class="input-field text-xs">
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4 text-xs font-semibold px-2">
+                                <div>
+                                    <span class="text-slate-400 block text-[10px] uppercase">Valeur Net Part</span>
+                                    <span class="text-blue-400 font-bold">${Math.round(valShare - crdShare).toLocaleString('fr-FR')} €</span>
+                                </div>
+                                <button onclick="deleteImmo(${bienIdx})" class="p-2 text-slate-500 hover:text-rose-400 hover:bg-slate-700/50 rounded-lg">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="pl-2 border-l-2 border-blue-500/40">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs font-semibold text-slate-300 flex items-center gap-1">
+                                    <i data-lucide="credit-card" class="w-3.5 h-3.5 text-blue-400"></i> Prêts associés (${bien.loans.length})
+                                </span>
+                                <button onclick="addImmoLoan(${bienIdx})" class="text-xs bg-slate-700 hover:bg-slate-600 text-blue-300 px-2.5 py-1 rounded-md flex items-center gap-1">
+                                    <i data-lucide="plus" class="w-3 h-3"></i> Prêt
+                                </button>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-xs text-left">
+                                    <thead class="text-slate-400 uppercase text-[10px] bg-slate-900/80">
+                                        <tr>
+                                            <th class="p-2">Intitulé Prêt</th>
+                                            <th class="p-2">Capital Prêté (€)</th>
+                                            <th class="p-2">Date Début</th>
+                                            <th class="p-2">Durée (Mois)</th>
+                                            <th class="p-2">Taux (%)</th>
+                                            <th class="p-2">Mensualité (€)</th>
+                                            <th class="p-2 text-right">CRD Prêt (€)</th>
+                                            <th class="p-2 text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-800">
+                                        ${loansRowsHtml}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // 2. RENDER ÉPARGNE
+            const epargneTbody = document.getElementById('epargne-tbody');
+            epargneTbody.innerHTML = '';
+            appData.epargne.forEach((item, idx) => {
+                epargneBrut += item.val;
+                epargneTbody.innerHTML += `
+                    <tr>
+                        <td class="p-2"><input type="text" value="${item.name}" onchange="updateEpargne(${idx}, 'name', this.value)" class="input-field text-xs"></td>
+                        <td class="p-2"><input type="number" value="${item.val}" onchange="updateEpargne(${idx}, 'val', +this.value)" class="input-field text-xs w-28"></td>
+                        <td class="p-2 text-center"><button onclick="deleteEpargne(${idx})" class="text-slate-500 hover:text-rose-400"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td>
+                    </tr>
+                `;
+            });
+
+           // 3. RENDER BOURSE
+const bourseTbody = document.getElementById('bourse-tbody');
+if (bourseTbody) {
+    bourseTbody.innerHTML = '';
+    appData.bourse.forEach((item, idx) => {
+        bourseBrut += item.val;
+        
+        // Attribution de la couleur selon le type
+        let badgeColor = "text-purple-400 bg-purple-500/10 border-purple-500/30";
+        if (item.name === "ETF") badgeColor = "text-blue-400 bg-blue-500/10 border-blue-500/30";
+        if (item.name === "Cryptomonnaies") badgeColor = "text-amber-400 bg-amber-500/10 border-amber-500/30";
+
+        bourseTbody.innerHTML += `
+            <tr class="hover:bg-slate-800/40 transition">
+                <td class="p-2.5">
+                    <span class="px-2.5 py-1 rounded-md text-xs font-semibold border ${badgeColor}">
+                        ${item.name}
+                    </span>
+                </td>
+                <td class="p-2.5 font-bold text-white">${Math.round(item.val).toLocaleString('fr-FR')} €</td>
+                <td class="p-2.5 text-center">
+                    <button onclick="deleteBourse(${idx})" class="text-slate-500 hover:text-rose-400"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+            // 4. RENDER VÉHICULES
+            const autoContainer = document.getElementById('auto-container');
+            autoContainer.innerHTML = '';
+
+            appData.auto.forEach((auto, autoIdx) => {
+                let autoCrdTotal = 0;
+                let autoMensTotal = 0;
+
+                auto.loans.forEach(loan => {
+                    let crd = calcCRD(loan.loanOrig, loan.rate, loan.durationMonths, loan.startDate);
+                    autoCrdTotal += crd;
+                    autoMensTotal += (loan.monthly || 0);
+                });
+
+                autoBrut += auto.val;
+                autoDette += autoCrdTotal;
+                autoMens += autoMensTotal;
+
+                let autoLoansRowsHtml = '';
+                auto.loans.forEach((loan, loanIdx) => {
+                    let crdLoan = calcCRD(loan.loanOrig, loan.rate, loan.durationMonths, loan.startDate);
+                    autoLoansRowsHtml += `
+                        <tr class="bg-slate-900/50">
+                            <td class="p-2 pl-4"><input type="text" value="${loan.name}" onchange="updateAutoLoan(${autoIdx}, ${loanIdx}, 'name', this.value)" class="input-field text-xs" placeholder="Ex: Crédit Auto..."></td>
+                            <td class="p-2"><input type="number" value="${loan.loanOrig}" onchange="updateAutoLoan(${autoIdx}, ${loanIdx}, 'loanOrig', +this.value)" class="input-field text-xs"></td>
+                            <td class="p-2"><input type="month" value="${loan.startDate || getCurrentYearMonth()}" onchange="updateAutoLoan(${autoIdx}, ${loanIdx}, 'startDate', this.value)" class="input-field text-xs"></td>
+                            <td class="p-2"><input type="number" value="${loan.durationMonths}" onchange="updateAutoLoan(${autoIdx}, ${loanIdx}, 'durationMonths', +this.value)" class="input-field text-xs"></td>
+                            <td class="p-2"><input type="number" step="0.01" value="${loan.rate}" onchange="updateAutoLoan(${autoIdx}, ${loanIdx}, 'rate', +this.value)" class="input-field text-xs"></td>
+                            <td class="p-2"><input type="number" value="${loan.monthly}" onchange="updateAutoLoan(${autoIdx}, ${loanIdx}, 'monthly', +this.value)" class="input-field text-xs"></td>
+                            <td class="p-2 text-right font-semibold text-rose-300">${Math.round(crdLoan).toLocaleString('fr-FR')} €</td>
+                            <td class="p-2 text-center">
+                                <button onclick="deleteAutoLoan(${autoIdx}, ${loanIdx})" class="text-slate-500 hover:text-rose-400"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                autoContainer.innerHTML += `
+                    <div class="bg-slate-800/60 border border-slate-700/70 rounded-xl p-4 space-y-3">
+                        <div class="flex flex-col md:flex-row justify-between md:items-center gap-3 bg-slate-800 p-3 rounded-lg border border-slate-700">
+                            <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-2">
+                                <div>
+                                    <label class="text-[10px] text-slate-400 uppercase font-bold">Nom du Véhicule</label>
+                                    <input type="text" value="${auto.name}" onchange="updateAuto(${autoIdx}, 'name', this.value)" class="input-field text-xs">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] text-slate-400 uppercase font-bold">Valeur (€)</label>
+                                    <input type="number" value="${auto.val}" onchange="updateAuto(${autoIdx}, 'val', +this.value)" class="input-field text-xs">
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4 text-xs font-semibold px-2">
+                                <div>
+                                    <span class="text-slate-400 block text-[10px] uppercase">Valeur Nette</span>
+                                    <span class="text-amber-400 font-bold">${Math.round(auto.val - autoCrdTotal).toLocaleString('fr-FR')} €</span>
+                                </div>
+                                <button onclick="deleteAuto(${autoIdx})" class="p-2 text-slate-500 hover:text-rose-400 hover:bg-slate-700/50 rounded-lg">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="pl-2 border-l-2 border-amber-500/40">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs font-semibold text-slate-300 flex items-center gap-1">
+                                    <i data-lucide="credit-card" class="w-3.5 h-3.5 text-amber-400"></i> Financements / Crédits (${auto.loans.length})
+                                </span>
+                                <button onclick="addAutoLoan(${autoIdx})" class="text-xs bg-slate-700 hover:bg-slate-600 text-amber-300 px-2.5 py-1 rounded-md flex items-center gap-1">
+                                    <i data-lucide="plus" class="w-3 h-3"></i> Financement
+                                </button>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-xs text-left">
+                                    <thead class="text-slate-400 uppercase text-[10px] bg-slate-900/80">
+                                        <tr>
+                                            <th class="p-2">Intitulé Prêt</th>
+                                            <th class="p-2">Capital Prêté (€)</th>
+                                            <th class="p-2">Date Début</th>
+                                            <th class="p-2">Durée (Mois)</th>
+                                            <th class="p-2">Taux (%)</th>
+                                            <th class="p-2">Mensualité (€)</th>
+                                            <th class="p-2 text-right">CRD Prêt (€)</th>
+                                            <th class="p-2 text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-800">
+                                        ${autoLoansRowsHtml}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // 5. RENDER HORLOGERIE
+            const horloTbody = document.getElementById('horlo-tbody');
+            horloTbody.innerHTML = '';
+            appData.horlo.forEach((item, idx) => {
+                horloBrut += item.val;
+
+                horloTbody.innerHTML += `
+                    <tr>
+                        <td class="p-2"><input type="text" value="${item.name}" onchange="updateHorlo(${idx}, 'name', this.value)" class="input-field text-xs"></td>
+                        <td class="p-2"><input type="number" value="${item.val}" onchange="updateHorlo(${idx}, 'val', +this.value)" class="input-field text-xs w-28"></td>
+                        <td class="p-2 text-center"><button onclick="deleteHorlo(${idx})" class="text-slate-500 hover:text-rose-400"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td>
+                    </tr>
+                `;
+            });
+
+            // Totals & KPIs
+            let totalBrut = immoBrut + epargneBrut + bourseBrut + autoBrut + horloBrut;
+            let totalDettes = immoDette + autoDette;
+            let totalNet = totalBrut - totalDettes;
+            let totalMens = immoMens + autoMens;
+
+            document.getElementById('kpi-brut').innerText = Math.round(totalBrut).toLocaleString('fr-FR') + ' €';
+            document.getElementById('kpi-dettes').innerText = Math.round(totalDettes).toLocaleString('fr-FR') + ' €';
+            document.getElementById('kpi-net').innerText = Math.round(totalNet).toLocaleString('fr-FR') + ' €';
+            document.getElementById('kpi-mensualites').innerText = Math.round(totalMens).toLocaleString('fr-FR') + ' € / mois';
+
+            // Summary Table
+            const summaryTbody = document.getElementById('summary-tbody');
+            summaryTbody.innerHTML = `
+                <tr>
+                    <td class="p-3 font-semibold text-blue-400">Immobilier</td>
+                    <td class="p-3 text-right">${Math.round(immoBrut).toLocaleString('fr-FR')} €</td>
+                    <td class="p-3 text-right text-rose-400">${Math.round(immoDette).toLocaleString('fr-FR')} €</td>
+                    <td class="p-3 text-right font-bold">${Math.round(immoBrut - immoDette).toLocaleString('fr-FR')} €</td>
+                    <td class="p-3 text-right">${Math.round(immoMens).toLocaleString('fr-FR')} €</td>
+                </tr>
+                <tr>
+                    <td class="p-3 font-semibold text-cyan-400">Épargne</td>
+                    <td class="p-3 text-right">${Math.round(epargneBrut).toLocaleString('fr-FR')} €</td>
+                    <td class="p-3 text-right text-slate-500">0 €</td>
+                    <td class="p-3 text-right font-bold">${Math.round(epargneBrut).toLocaleString('fr-FR')} €</td>
+                    <td class="p-3 text-right">0 €</td>
+                </tr>
+                <tr>
+                    <td class="p-3 font-semibold text-purple-400">Bourse & Investissements</td>
+                    <td class="p-3 text-right">${Math.round(bourseBrut).toLocaleString('fr-FR')} €</td>
+                    <td class="p-3 text-right text-slate-500">0 €</td>
+                    <td class="p-3 text-right font-bold">${Math.round(bourseBrut).toLocaleString('fr-FR')} €</td>
+                    <td class="p-3 text-right">0 €</td>
+                </tr>
+                <tr>
+                    <td class="p-3 font-semibold text-amber-400">Véhicules</td>
+                    <td class="p-3 text-right">${Math.round(autoBrut).toLocaleString('fr-FR')} €</td>
+                    <td class="p-3 text-right text-rose-400">${Math.round(autoDette).toLocaleString('fr-FR')} €</td>
+                    <td class="p-3 text-right font-bold">${Math.round(autoBrut - autoDette).toLocaleString('fr-FR')} €</td>
+                    <td class="p-3 text-right">${Math.round(autoMens).toLocaleString('fr-FR')} €</td>
+                </tr>
+                <tr>
+                    <td class="p-3 font-semibold text-emerald-400">Horlogerie</td>
+                    <td class="p-3 text-right">${Math.round(horloBrut).toLocaleString('fr-FR')} €</td>
+                    <td class="p-3 text-right text-slate-500">0 €</td>
+                    <td class="p-3 text-right font-bold">${Math.round(horloBrut).toLocaleString('fr-FR')} €</td>
+                    <td class="p-3 text-right">0 €</td>
+                </tr>
+            `;
+
+            updateChart(immoBrut - immoDette, epargneBrut, bourseBrut, autoBrut - autoDette, horloBrut);
+            lucide.createIcons();
+        }
+
+        function updateChart(immoNet, epargneNet, bourseNet, autoNet, horloNet) {
+            const ctx = document.getElementById('patrimoineChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+
+            chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Immobilier', 'Épargne', 'Bourse', 'Véhicules', 'Horlogerie'],
+                    datasets: [{
+                        data: [
+                            Math.max(0, immoNet), 
+                            Math.max(0, epargneNet), 
+                            Math.max(0, bourseNet), 
+                            Math.max(0, autoNet), 
+                            Math.max(0, horloNet)
+                        ],
+                        backgroundColor: ['#3B82F6', '#06B6D4', '#A855F7', '#F59E0B', '#10B981'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { color: '#94A3B8' } } }
+                }
+            });
+        }
+
+        // --- IMMOBILIER FUNCTIONS ---
+        function updateImmo(idx, field, val) { appData.immo[idx][field] = val; saveData(); }
+        function deleteImmo(idx) { appData.immo.splice(idx, 1); saveData(); }
+        function addImmo() { 
+            appData.immo.push({ 
+                name: "Nouveau Bien", share: 100, val: 250000, 
+                loans: [{ name: "Prêt Principal", loanOrig: 200000, startDate: getCurrentYearMonth(), durationMonths: 240, rate: 3.5, monthly: 1160 }] 
+            }); 
+            saveData(); 
+        }
+
+        function updateImmoLoan(bienIdx, loanIdx, field, val) { appData.immo[bienIdx].loans[loanIdx][field] = val; saveData(); }
+        function addImmoLoan(bienIdx) {
+            appData.immo[bienIdx].loans.push({ name: "Nouveau Prêt", loanOrig: 10000, startDate: getCurrentYearMonth(), durationMonths: 120, rate: 2.5, monthly: 94 });
+            saveData();
+        }
+        function deleteImmoLoan(bienIdx, loanIdx) {
+            appData.immo[bienIdx].loans.splice(loanIdx, 1);
+            saveData();
+        }
+
+        // --- ÉPARGNE FUNCTIONS ---
+        function updateEpargne(idx, field, val) { appData.epargne[idx][field] = val; saveData(); }
+        function deleteEpargne(idx) { appData.epargne.splice(idx, 1); saveData(); }
+        function addEpargne() { appData.epargne.push({ name: "Nouveau Livret", val: 1000 }); saveData(); }
+
+        // --- BOURSE FUNCTIONS ---
+        function updateBourse(idx, field, val) { appData.bourse[idx][field] = val; saveData(); }
+        function deleteBourse(idx) { appData.bourse.splice(idx, 1); saveData(); }
+        function addBourse() { appData.bourse.push({ name: "Nouveau Compte Bourse", val: 1000 }); saveData(); }
+
+        // --- VÉHICULES FUNCTIONS ---
+        function updateAuto(idx, field, val) { appData.auto[idx][field] = val; saveData(); }
+        function deleteAuto(idx) { appData.auto.splice(idx, 1); saveData(); }
+        function addAuto() { 
+            appData.auto.push({ 
+                name: "Nouveau Véhicule", val: 20000, 
+                loans: [{ name: "Crédit Auto", loanOrig: 15000, startDate: getCurrentYearMonth(), durationMonths: 60, rate: 4.0, monthly: 276 }] 
+            }); 
+            saveData(); 
+        }
+
+        function updateAutoLoan(autoIdx, loanIdx, field, val) { appData.auto[autoIdx].loans[loanIdx][field] = val; saveData(); }
+        function addAutoLoan(autoIdx) {
+            appData.auto[autoIdx].loans.push({ name: "Nouveau Financement", loanOrig: 5000, startDate: getCurrentYearMonth(), durationMonths: 36, rate: 3.5, monthly: 146 });
+            saveData();
+        }
+        function deleteAutoLoan(autoIdx, loanIdx) {
+            appData.auto[autoIdx].loans.splice(loanIdx, 1);
+            saveData();
+        }
+
+       // --- HORLOGERIE FUNCTIONS ---
+function updateHorlo(idx, field, val) { appData.horlo[idx][field] = val; saveData(); }
+function deleteHorlo(idx) { appData.horlo.splice(idx, 1); saveData(); }
+function addHorlo() { appData.horlo.push({ name: "Nouvelle montre", val: 2000 }); saveData(); }
+
+window.onload = function() { 
+    calculateAll(); 
+    synchroAuto();
+};
+
+async function synchroAuto() {
+    try {
+        const reponse = await fetch('https://mon-patrimoine-api.onrender.com/api/bourse');
+        const donnes = await reponse.json();
+
+        if (donnes.details) {
+            appData.bourse = [
+                { name: "Actions", val: donnes.details.actions },
+                { name: "ETF", val: donnes.details.etf },
+                { name: "Cryptomonnaies", val: donnes.details.crypto }
+            ];
+            saveData();
+            calculateAll();
+        }
+    } catch (e) {
+        console.log("Serveur non démarré pour l'auto-synchronisation");
+    }
+}
+</script>
+</body>
+</html>
